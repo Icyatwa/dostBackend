@@ -1,6 +1,5 @@
 // controllers/rideController.js
 const Ride = require('../models/ride');
-// const { io } = require('../server');
 
 // Create a new ride
 exports.createRide = async (req, res) => {
@@ -39,7 +38,6 @@ exports.createRide = async (req, res) => {
     });
     const savedRide = await newRide.save();
 
-    // io.emit("ride_created", savedRide);
 
     res.status(201).json(savedRide);
   } catch (error) {

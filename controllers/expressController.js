@@ -1,14 +1,15 @@
 // controllers/rideController.js
 const Express = require('../models/express');
 const { io } = require('../server');
-
 exports.createRide = async (req, res) => {
   try {
     const {
       bus,
-      driver,
+      // driver,
       licensePlates,
       driverName,
+      location,
+      destination,
       time,
       pickup,
       dropoff,
@@ -17,9 +18,11 @@ exports.createRide = async (req, res) => {
     } = req.body;
     const newRide = new Express({
         bus,
-        driver,
+        // driver,
         licensePlates,
         driverName,
+        location,
+        destination,
         time,
         pickup,
         dropoff,
@@ -38,18 +41,17 @@ exports.createRide = async (req, res) => {
 
 exports.getAllRides = async (req, res) => {
   try {
-    const rides = await Express.find();
-    res.status(200).json(rides);
+    const busRides = await Express.find();
+    res.status(200).json(busRides);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
 
-exports.getRidesByDriverId = async (req, res) => {
-  const driverId = req.params.driverId; // Corrected from driver to driverId
+exports.getRidesByDriverId = async (req, res) => {// Corrected from driver to driverId
   try {
-    const rides = await Express.find({ driver: driverId });
+    const rides = await Express.find();
     res.status(200).json(rides);
   } catch (error) {
     console.error(error);

@@ -1,9 +1,12 @@
 // server.js
+
 const express = require('express');
 const cors = require('cors');
 const rideRoutes = require('./routes/rideRoutes');
 const expressRoutes = require('./routes/expressRoutes');
 const busRoutes = require('./routes/busRoutes');
+const bookingRoutes = require('./routes/bookingRoutes');
+const authRoutes = require('./routes/expressAuthRoutes'); // Import authentication routes
 const connectDB = require('./config/database');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -16,18 +19,24 @@ app.use(express.json());
 
 // API routes
 app.use('/api/rides', rideRoutes);
-app.use('/api/express', expressRoutes);
+app.use('/api/expressRides', expressRoutes);
 app.use('/api/bus', busRoutes);
+app.use('/api/bookings', bookingRoutes);
+
+// Include authentication routes
+app.use('/api/auth', authRoutes);
 
 const server = http.createServer(app);
 const io = socketIo(server);
 
 module.exports.io = io;
 
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server is running on port `, PORT);
+connectDB()
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.log(error);
   });
-}).catch((error) => {
-  console.log(error);
-});

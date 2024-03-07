@@ -73,3 +73,31 @@ exports.getRideById = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
+
+exports.updateRideById = async (req, res) => {
+  const rideId = req.params.rideId;
+  try {
+    const updatedRide = await Express.findByIdAndUpdate(rideId, req.body, { new: true });
+    if (!updatedRide) {
+      return res.status(404).json({ message: 'Ride not found' });
+    }
+    res.status(200).json(updatedRide);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
+
+exports.deleteRideById = async (req, res) => {
+  const rideId = req.params.rideId;
+  try {
+    const deletedRide = await Express.findByIdAndDelete(rideId);
+    if (!deletedRide) {
+      return res.status(404).json({ message: 'Ride not found' });
+    }
+    res.status(200).json({ message: 'Ride deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};

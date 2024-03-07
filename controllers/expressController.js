@@ -1,11 +1,10 @@
-// controllers/rideController.js
+
 const Express = require('../models/express');
 const { io } = require('../server');
 exports.createRide = async (req, res) => {
   try {
     const {
       bus,
-      // driver,
       licensePlates,
       driverName,
       location,
@@ -18,7 +17,6 @@ exports.createRide = async (req, res) => {
     } = req.body;
     const newRide = new Express({
         bus,
-        // driver,
         licensePlates,
         driverName,
         location,
@@ -49,7 +47,7 @@ exports.getAllRides = async (req, res) => {
   }
 };
 
-exports.getRidesByDriverId = async (req, res) => {// Corrected from driver to driverId
+exports.getRidesByDriverId = async (req, res) => {
   try {
     const rides = await Express.find();
     res.status(200).json(rides);

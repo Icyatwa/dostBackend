@@ -25,7 +25,6 @@ const ExpressAuthSchema = new Schema({
     },
 })
 
-// static signup method
 ExpressAuthSchema.statics.signup = async function(email, password) {
 
   
@@ -47,7 +46,6 @@ ExpressAuthSchema.statics.signup = async function(email, password) {
     return express
 }
 
-// static login method
 ExpressAuthSchema.statics.login = async function(expressName, email, password, expressCode) {
 
   if ( !expressName || !email || !password || !expressCode ) {

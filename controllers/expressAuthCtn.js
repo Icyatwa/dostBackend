@@ -1,6 +1,5 @@
 const User = require('../models/expressAuth');
 
-// Signup controller method
 exports.signup = async (req, res) => {
     try {
         const { expressName, email, password, expressCode } = req.body;
@@ -11,7 +10,6 @@ exports.signup = async (req, res) => {
     }
 };
 
-// Login controller method
 exports.login = async (req, res) => {
     try {
         const { expressName, email, password, expressCode } = req.body;

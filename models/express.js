@@ -1,4 +1,4 @@
-// models/ride.js
+
 const mongoose = require('mongoose');
 
 const expressSchema = new mongoose.Schema({

@@ -1,7 +1,7 @@
 
 const mongoose = require('mongoose');
 
-const rideSchema = new mongoose.Schema({
+const carpoolSchema = new mongoose.Schema({
   driverId: { type: String, required: true },
   username: { type: String, required: true },
   phoneNumber: { type: String, required: true },
@@ -18,6 +18,6 @@ const rideSchema = new mongoose.Schema({
   price: { type: String, required: true },
 }, { timestamps: true });
 
-const Ride = mongoose.model('Ride', rideSchema);
+const Carpool = mongoose.model('Carpool', carpoolSchema);
 
-module.exports = Ride;
+module.exports = Carpool;

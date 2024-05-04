@@ -4,9 +4,8 @@ const mongoose = require('mongoose');
 
 const getRides = async (req, res) => {
   const user_id = req.user._id;
-
   try {
-    const rides = await Ride.find({ user_id }).populate('bus').sort({ createdAt: -1 }); // Populate the 'bus' field
+    const rides = await Ride.find({ user_id }).populate('bus').sort({ createdAt: -1 });
     res.status(200).json(rides);
   } catch (error) {
     console.error('Error fetching rides:', error);
@@ -14,11 +13,10 @@ const getRides = async (req, res) => {
   }
 };
 
-
 const getRideById = async (req, res) => {
   const rideId = req.params.rideId;
   try {
-    const ride = await Ride.findById(rideId);
+    const ride = await Ride.findById(rideId).populate('bus');
     if (!ride) {
       return res.status(404).json({ message: 'Ride not found' });
     }
@@ -28,11 +26,10 @@ const getRideById = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
- 
 
 const getAllRides = async (req, res) => {
   try {
-    const rides = await Ride.find().sort({ createdAt: -1 });
+    const rides = await Ride.find().populate('bus').sort({ createdAt: -1 });
     res.status(200).json(rides);
   } catch (error) {
     console.error('Error fetching rides:', error);
@@ -42,22 +39,17 @@ const getAllRides = async (req, res) => {
 
 const getRide = async (req, res) => {
   const { id } = req.params
-
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(404).json({error: 'No such ride'})
   }
-
-  const ride = await Ride.findById(id)
-
+  const ride = await Ride.findById(id).populate('bus')
   if (!ride) {
     return res.status(404).json({error: 'No such ride'})
   }
-  
   res.status(200).json(ride)
 }
 
 const routePrices = {
-  // Existing routes and prices
   "Nyabugogo-Huye": 3700,
   "Misove-Base": 2500,
   "Kigali-Misove": 4500,
@@ -65,16 +57,13 @@ const routePrices = {
   "Kigali-Huye": 1500,
   "Kigali-Gisagara": 2500,
   "Huye-Gisagara": 500,
-  // New routes and prices
   "Nyabugogo-Gicumbi-Gatuna": 1082,
   "Rukomo-Gicumbi-Gatuna": 1038,
   "Gicumbi-Base": 1462,
   "Gicumbi-Rutare": 1462,
   "Gicumbi-Gakenke": 2003,
   "Gicumbi-Kivuye": 2016,
-  // other routes...
 };
-
 const calculateRidePrice = (stations) => {
   if (!Array.isArray(stations)) {
     return null; // Return null if stations is not an array
@@ -94,7 +83,6 @@ const calculateRidePrice = (stations) => {
 
   return totalPrice;
 };
-
 const stations = ['Kigali', 'Huye'];
 const price = calculateRidePrice(stations);
 if (price !== null) {
@@ -102,7 +90,6 @@ if (price !== null) {
 } else {
   console.log('Price not found for the provided route');
 }
-
 const createRide = async (req, res) => {
   const { stations, time, bus_id, price, schedule } = req.body;
   let emptyFields = [];
@@ -226,7 +213,6 @@ const createRide = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
-
 module.exports = {
   createRide,
   calculateRidePrice,

@@ -18,7 +18,6 @@ router.post('/authenticated', createRide);
 
 router.post('/price', async (req, res) => {
   const { stations } = req.body;
-
   if (!Array.isArray(stations) || stations.length < 2) {
     return res.status(400).json({ error: 'Invalid stations provided' });
   }

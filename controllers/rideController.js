@@ -1,6 +1,7 @@
 const Bus = require('../models/busModel');
 const Ride = require('../models/rideModel');
 const mongoose = require('mongoose');
+const BusDetails = require('../models/busDetailsModel')
 
 const getRides = async (req, res) => {
   const user_id = req.user._id;
@@ -64,6 +65,7 @@ const routePrices = {
   "Gicumbi-Gakenke": 2003,
   "Gicumbi-Kivuye": 2016,
 };
+
 const calculateRidePrice = (stations) => {
   if (!Array.isArray(stations)) {
     return null; // Return null if stations is not an array
@@ -83,13 +85,16 @@ const calculateRidePrice = (stations) => {
 
   return totalPrice;
 };
+
 const stations = ['Kigali', 'Huye'];
 const price = calculateRidePrice(stations);
+
 if (price !== null) {
   console.log('Price:', price);
 } else {
   console.log('Price not found for the provided route');
 }
+
 const createRide = async (req, res) => {
   const { stations, time, bus_id, price, schedule } = req.body;
   let emptyFields = [];
@@ -118,6 +123,7 @@ const createRide = async (req, res) => {
 
     const user_id = req.user._id;
     const rides = [];
+    const rideGroupId = new mongoose.Types.ObjectId();
 
     const existingRidesFromAB = await Ride.find({ bus: selectedBus, stations: [stations[0], stations[1]] });
     const existingRidesFromBA = await Ride.find({ bus: selectedBus, stations: [stations[1], stations[0]] });
@@ -131,28 +137,27 @@ const createRide = async (req, res) => {
     }
 
     if (schedule.type === 'interval') {
-      // Calculate the interval in milliseconds based on the provided frequency and interval unit
       let intervalMilliseconds;
       if (schedule.intervalUnit === 'minutes') {
-        intervalMilliseconds = schedule.frequency * 60000; // 1 minute = 60000 milliseconds
+        intervalMilliseconds = schedule.frequency * 60000;
       } else if (schedule.intervalUnit === 'hours') {
-        intervalMilliseconds = schedule.frequency * 3600000; // 1 hour = 3600000 milliseconds
+        intervalMilliseconds = schedule.frequency * 3600000;
       }
 
-      // Create rides immediately and then start interval for subsequent rides
       const createRides = async () => {
+        
         for (let i = 0; i < stations.length - 1; i++) {
           for (let j = i + 1; j < stations.length; j++) {
             const ridePrice = price || calculateRidePrice([stations[i], stations[j]]);
 
-            // Create ride objects
             const ride1 = await Ride.create({
               bus: selectedBus,
               stations: [stations[i], stations[j]],
               time,
               price: ridePrice ? ridePrice : null,
               user_id,
-              publishSchedule: [] // Since this is an interval-based ride, we don't need a specific publish schedule
+              rideGroupId,
+              publishSchedule: []
             });
             rides.push(ride1);
 
@@ -162,35 +167,39 @@ const createRide = async (req, res) => {
               time,
               price: ridePrice ? ridePrice : null,
               user_id,
-              publishSchedule: [] // Since this is an interval-based ride, we don't need a specific publish schedule
+              rideGroupId,
+              publishSchedule: []
             });
             rides.push(ride2);
           }
         }
+
+        const busDetails = await BusDetails.findOne({ rideGroupId });
+        if (!busDetails) {
+          await BusDetails.create({
+            rideGroupId,
+            busCapacity: selectedBus.capacity
+          });
+        }
       };
 
-      // Call createRides immediately
       await createRides();
-
-      // Start interval for subsequent rides
       const intervalId = setInterval(createRides, intervalMilliseconds);
-
-      // Return the intervalId in the response so it can be cleared if needed
       res.status(200).json({ rides, intervalId });
     } else {
-      // If the schedule type is not 'interval', create rides as usual based on the provided schedule
+      
       for (let i = 0; i < stations.length - 1; i++) {
         for (let j = i + 1; j < stations.length; j++) {
           const ridePrice = price || calculateRidePrice([stations[i], stations[j]]);
 
-          // Create ride objects
           const ride1 = await Ride.create({
             bus: selectedBus,
             stations: [stations[i], stations[j]],
             time,
             price: ridePrice ? ridePrice : null,
             user_id,
-            publishSchedule: schedule.type === 'scheduled' ? schedule.times : [] // Add publish schedule if provided
+            rideGroupId,
+            publishSchedule: schedule.type === 'scheduled' ? schedule.times : []
           });
           rides.push(ride1);
 
@@ -200,10 +209,19 @@ const createRide = async (req, res) => {
             time,
             price: ridePrice ? ridePrice : null,
             user_id,
-            publishSchedule: schedule.type === 'scheduled' ? schedule.times : [] // Add publish schedule if provided
+            rideGroupId,
+            publishSchedule: schedule.type === 'scheduled' ? schedule.times : []
           });
           rides.push(ride2);
         }
+      }
+
+      const busDetails = await BusDetails.findOne({ rideGroupId });
+      if (!busDetails) {
+        await BusDetails.create({
+          rideGroupId,
+          busCapacity: selectedBus.capacity
+        });
       }
 
       res.status(200).json(rides);
@@ -213,6 +231,10 @@ const createRide = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
+
+module.exports = { createRide };
+
 module.exports = {
   createRide,
   calculateRidePrice,

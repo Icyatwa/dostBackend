@@ -31,44 +31,57 @@ const getBus = async (req, res) => {
 }
 
 const createBus = async (req, res) => {
-    const
-        {
-            driver,
-            licensePlates,
-            model,
-            capacity,
-        } = req.body
-    let emptyFields = []
-    if(!driver) {
-        emptyFields.push('driver')
+  const { driver, licensePlates, model, capacity } = req.body;
+  let emptyFields = [];
+  if (!driver) {
+    emptyFields.push('driver');
+  }
+  if (!licensePlates) {
+    emptyFields.push('licensePlates');
+  }
+  if (!model) {
+    emptyFields.push('model');
+  }
+  if (!capacity) {
+    emptyFields.push('capacity');
+  }
+  if (emptyFields.length > 0) {
+    return res.status(400).json({ error: 'Please fill in all the fields', emptyFields });
+  }
+  try {
+    const user_id = req.user._id;
+    const bus = await Bus.create({
+      driver,
+      licensePlates,
+      model,
+      capacity,
+      user_id
+    });
+    res.status(200).json(bus);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+  
+const updateBus = async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(404).json({ error: 'No such bus' });
+  }
+  try {
+    const existingBus = await Bus.findById(id);
+    if (!existingBus) {
+      return res.status(404).json({ error: 'No such bus' });
     }
-    if(!licensePlates) {
-        emptyFields.push('licensePlates')
-    }
-    if(!model) {
-        emptyFields.push('model')
-    }
-    if(!capacity) {
-        emptyFields.push('capacity')
-    }
-    if(emptyFields.length > 0) {
-        return res.status(400).json({ error: 'Please fill in all the fields', emptyFields })
-    }
-    try {
-        const user_id = req.user._id
-        const bus = await Bus.create
-            ({
-                driver,
-                licensePlates,
-                model,
-                capacity,
-                user_id
-            })
-        res.status(200).json(bus)
-    } catch (error) {
-        res.status(400).json({error: error.message})
-    }
+    const updatedBus = await Bus.findByIdAndUpdate(id, req.body, { new: true });
+    res.status(200).json(updatedBus);
+  } catch (error) {
+    console.error('Error updating bus:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 }
+
+  
 
 const deleteBus = async (req, res) => {
     const { id } = req.params
@@ -80,25 +93,6 @@ const deleteBus = async (req, res) => {
         return res.status(400).json({error: 'No such bus'})
     }
     res.status(200).json(bus)
-}
-
-const updateBus = async (req, res) => {
-    const { id } = req.params
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(404).json({error: 'No such bus'})
-    }
-    try {
-        const existingBus = await Bus.findById(id);
-        if (!existingBus) {
-            return res.status(404).json({ error: 'No such bus' });
-        }
-        Object.assign(existingRide, req.body);
-        const updatedBus = await existingBus.save();
-        res.status(200).json(updatedBus);
-    } catch (error) {
-        console.error('Error updating bus:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
 }
 
 module.exports = {

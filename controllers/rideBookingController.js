@@ -1,3 +1,4 @@
+
 // // rideBookingController.js
 // const RideBooking = require('../models/rideBookingModel');
 // const BusDetails = require('../models/busDetailsModel');
@@ -45,42 +46,40 @@ const bookRide = async (req, res) => {
       return res.status(404).json({ error: 'Ride not found' });
     }
 
-    // Retrieve the bus details associated with this ride's rideGroupId
-    const busDetails = await BusDetails.findOne({ rideGroupId: ride.rideGroupId });
-    if (!busDetails) {
-      return res.status(404).json({ error: 'Bus details not found' });
-    }
-
-    // Update bus capacity only for the segment's starting and ending stations
-    const stations = ride.stations;
-    const startStation = stations[0];
-    const endStation = stations[stations.length - 1];
-
-    // Filter rides by those starting or ending at the same stations
-    const ridesToUpdate = await Ride.find({
+    // Find rides with matching segments
+    const ridesWithMatchingSegments = await Ride.find({
       rideGroupId: ride.rideGroupId,
-      $or: [
-        { stations: { $all: [startStation, endStation] } },
-        { stations: { $all: [endStation, startStation] } }
-      ]
+      stations: { $in: ride.stations }
     });
 
-    // Update bus capacity for each relevant ride
-    for (const rideToUpdate of ridesToUpdate) {
-      const updatedBusDetails = await BusDetails.findOneAndUpdate(
-        { rideGroupId: rideToUpdate.rideGroupId },
-        { $inc: { busCapacity: -seatsBooked } },
-        { new: true }
-      );
+    // Calculate total seats booked considering all matching rides
+    let totalSeatsBooked = 0;
+    for (const matchingRide of ridesWithMatchingSegments) {
+      const bookings = await RideBooking.find({ ride: matchingRide._id });
+      totalSeatsBooked += bookings.reduce((acc, curr) => acc + curr.seatsBooked, 0);
     }
 
-    res.status(201).json({ message: 'Booking successful' });
+    const updatedBusDetails = await BusDetails.findOneAndUpdate(
+      { rideGroupId: ride.rideGroupId },
+      { $inc: { busCapacity: -totalSeatsBooked } },
+      { new: true }
+    );
+
+    // Create booking for the specific ride
+    const booking = await RideBooking.create({
+      ride: ride_id,
+      seatsBooked
+    });
+
+    res.status(201).json({ booking, updatedBusDetails });
   } catch (error) {
     console.error('Error booking ride:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
+
+module.exports = { bookRide };
 
 
 module.exports = { bookRide };

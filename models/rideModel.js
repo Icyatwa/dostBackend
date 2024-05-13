@@ -1,3 +1,5 @@
+
+
 const mongoose = require('mongoose');
 
 const rideSchema = new mongoose.Schema({
@@ -7,8 +9,9 @@ const rideSchema = new mongoose.Schema({
   price: { type: Number },
   user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   publishSchedule: { type: [Object] },
-  rideGroupId: { type: mongoose.Schema.Types.ObjectId, required: true } // Added rideGroupId field
-});
+  rideGroupId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  bookedSeats: { type: Map, of: Number, default: {} }
+}, { timestamps: true });
 
 const Ride = mongoose.model('Ride', rideSchema);
 

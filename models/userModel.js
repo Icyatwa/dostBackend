@@ -1,3 +1,4 @@
+// userModel.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const validator = require('validator');
@@ -50,7 +51,7 @@ userSchema.statics.signup = async function(email, password, companyName, accessC
     'Fidelity Express': 'FDTY2024',
     'Yahoo Car Express': 'YCEX2024',
     'Alpha Express': 'ALPX2024',
-    'Long Express': 'LONG2024',
+    'Three Express': 'Three2024',
   };
 
   if (companyAccessCodes[companyName] !== accessCode) {
@@ -63,14 +64,14 @@ userSchema.statics.signup = async function(email, password, companyName, accessC
   return user;
 };
 
-userSchema.statics.login = async function(email, password) {
-  if (!email || !password) {
+userSchema.statics.login = async function(companyName, password) {
+  if (!companyName || !password) {
     throw new Error('All fields must be filled');
   }
 
-  const user = await this.findOne({ email });
+  const user = await this.findOne({ companyName });
   if (!user) {
-    throw new Error('Incorrect email');
+    throw new Error('Incorrect company name');
   }
 
   const match = await bcrypt.compare(password, user.password);

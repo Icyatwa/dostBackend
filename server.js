@@ -9,7 +9,12 @@ const userRoutes = require('./routes/user');
 const busRoutes = require('./routes/bus');
 const rideRoutes = require('./routes/ride');
 const bookingRoutes = require('./routes/rideBookingRoutes');
-const busDetailsRoutes = require('./routes/busDetails'); // Import the busDetailsRoutes
+const busDetailsRoutes = require('./routes/busDetails');
+const cabRoutes = require('./routes/cab')
+const cabDetailsRoutes = require('./routes/cabDetails');
+const taxiRoutes = require('./routes/taxi');
+const taxiBookingRoutes = require('./routes/taxiBookingRoutes');
+const taxiDriverRoutes = require('./routes/taxiDriver');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,7 +27,11 @@ app.use('/api/user', userRoutes);
 app.use('/api/bus', busRoutes);
 app.use('/api/rides', rideRoutes);
 app.use('/api/bookings', bookingRoutes);
-app.use('/api/details', busDetailsRoutes); // Use the busDetailsRoutes for bus details
+app.use('/api/cabDetails', cabDetailsRoutes);
+app.use('/api/taxis', taxiRoutes);
+app.use('/api/taxiBookings', taxiBookingRoutes);
+app.use('/api/taxiDrivers', taxiDriverRoutes);
+app.use('/api/cabs', cabRoutes);
 
 const server = http.createServer(app);
 const io = socketIo(server);

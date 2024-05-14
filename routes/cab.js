@@ -7,7 +7,7 @@ const {
     deleteCab,
     updateCab
 } = require('../controllers/cabController')
-const requireAuth = require('../middleware/requireAuth')
+const requireAuth = require('../middleware/taxiRequireAuth')
 
 const router = express.Router()
 

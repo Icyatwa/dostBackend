@@ -34,6 +34,7 @@ userSchema.statics.signup = async function(email, password, companyName, accessC
   }
   
     const companyAccessCodes = {
+    'Ritco': 'RTC2024',
     'East African Bus & Travel Ltd': 'EABT2024',
     'Ruhire Express': 'RHXP2024',
     'Kigali Coach Tour & Travel': 'KCTT2024',

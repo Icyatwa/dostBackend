@@ -8,7 +8,7 @@ const {
   getTaxi,
   calculateRidePrice,
 } = require('../controllers/taxiController');
-const requireAuth = require('../middleware/requireAuth');
+const requireAuth = require('../middleware/taxiRequireAuth');
 router.use('/authenticated', requireAuth);
 router.get('/authenticated', getTaxis);
 router.get('/taxi/:taxiId', getTaxiById);

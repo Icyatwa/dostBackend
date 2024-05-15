@@ -1,4 +1,4 @@
-// userModel.js
+// taxiDriverModel.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const validator = require('validator');
@@ -34,7 +34,7 @@ driverSchema.statics.signup = async function(email, password, companyName, acces
   }
   
     const companyAccessCodes = {
-    'Yego Cabs': 'YEGO2024',
+    'Yes Cabs': 'YEGO2024',
     'Move Cabs': 'CABS2024',
   };
 
@@ -62,7 +62,7 @@ driverSchema.statics.login = async function(companyName, password) {
   if (!match) {
     throw new Error('Incorrect password');
   }
-
+ 
   return taxiDriver;
 };
 

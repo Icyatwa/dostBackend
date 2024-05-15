@@ -3,7 +3,7 @@ const mongoose = require('mongoose')
 
 const getCabs = async (req, res) => {
   const taxiDriver_id = req.taxiDriver._id
-  const cabs = await Bus.find({taxiDriver_id})
+  const cabs = await Cab.find({taxiDriver_id})
     .sort({createdAt: -1})
   res.status(200).json(cabs)
 }
@@ -50,7 +50,7 @@ const createCab = async (req, res) => {
   }
   try {
     const taxiDriver_id = req.taxiDriver._id;
-    const cab = await Cab.create({
+    const cab = await Cab.create({ 
       driver,
       licensePlates,
       model,

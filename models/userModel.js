@@ -51,7 +51,7 @@ userSchema.statics.signup = async function(email, password, companyName, accessC
     'Fidelity Express': 'FDTY2024',
     'Yahoo Car Express': 'YCEX2024',
     'Alpha Express': 'ALPX2024',
-    'Three Express': 'Three2024',
+    'Two Express': 'Two2024',
   };
 
   if (companyAccessCodes[companyName] !== accessCode) {

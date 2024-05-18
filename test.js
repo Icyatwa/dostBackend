@@ -1,128 +1,79 @@
-
-
-// taxiRequireAuth.js
-const jwt = require('jsonwebtoken')
-const TaxiDriver = require('../models/taxiDriverModel')
-
-const requireAuth = async (req, res, next) => {
-  // verify user is authenticated
-  const { authorization } = req.headers
- 
-  if (!authorization) {
-    return res.status(401).json({error: 'Authorization token required'})
-  }
-
-  const token = authorization.split(' ')[1]
-
-  try {
-    const { _id } = jwt.verify(token, process.env.TAXISECRET)
-
-    req.taxiDriver = await TaxiDriver.findOne({ _id }).select('_id')
-    next()
-
-  } catch (error) {
-    console.log(error)
-    res.status(401).json({error: 'Request is not authorized'})
-  }
-}
-
-module.exports = requireAuth
-
-// taxiDriverModel.js
+// busDetailsModel.js
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
-const validator = require('validator');
 
-const Schema = mongoose.Schema;
-
-const driverSchema = new Schema({
-    email: {
-        type: String,
-        unique: true,
-        required: true,
-        validate: [validator.isEmail, 'Invalid email']
-    },
-    password: {
-        type: String,
-        required: true
-    },
-    companyName: {
-        type: String,
-        unique: true,
-        required: true
-    },
-    accessCode: {
-        type: String,
-        unique: true,
-        required: true
-    }
+const busDetailsModel = new mongoose.Schema({
+  rideGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Ride', required: true },
+  busCapacity: { type: Number, required: true },
+  busPlates: { type: Number }
 });
 
-driverSchema.statics.signup = async function(email, password, companyName, accessCode) {
-  if (!email || !password || !companyName || !accessCode) {
-    throw new Error('All fields must be filled');
-  }
-  
-    const companyAccessCodes = {
-    'Yes Cabs': 'YEGO2024',
-    'Move Cabs': 'CABS2024',
-  };
+module.exports = mongoose.model('BusDetails', busDetailsModel);
 
-  if (companyAccessCodes[companyName] !== accessCode) {
-    throw new Error('Invalid access code for the specified company');
-  }
 
-  const salt = await bcrypt.genSalt(10);
-  const hash = await bcrypt.hash(password, salt);
-  const taxiDriver = await this.create({ email, password: hash, companyName, accessCode });
-  return taxiDriver;
+
+
+// busDetailsController.js
+
+const BusDetails = require('../models/busDetailsModel');
+
+const getBusDetails = async (req, res) => {
+  try {
+    const busDetails = await BusDetails.find();
+    res.json(busDetails);
+  } catch (error) {
+    console.error('Error fetching bus details:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 };
 
-driverSchema.statics.login = async function(companyName, password) {
-  if (!companyName || !password) {
-    throw new Error('All fields must be filled');
+const getBusDetailsById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const busDetails = await BusDetails.findOne({ rideGroupId: id }); // Find by rideGroupId
+    if (!busDetails) {
+      return res.status(404).json({ error: 'Bus details not found' });
+    }
+    res.json(busDetails);
+  } catch (error) {
+    console.error('Error fetching bus details:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-
-  const taxiDriver = await this.findOne({ companyName });
-  if (!taxiDriver) {
-    throw new Error('Incorrect company name');
-  }
-
-  const match = await bcrypt.compare(password, taxiDriver.password);
-  if (!match) {
-    throw new Error('Incorrect password');
-  }
- 
-  return taxiDriver;
 };
 
-module.exports = mongoose.model('Driver', driverSchema);
+
+module.exports = {
+  getBusDetails,
+  getBusDetailsById
+};
 
 
-// taxiModel.js
+
+// rideModel.js
+
 const mongoose = require('mongoose');
 
-const taxiSchema = new mongoose.Schema({
-  cab: { type: mongoose.Schema.Types.ObjectId, ref: 'Cab', required: true},
+const rideSchema = new mongoose.Schema({
+  bus: { type: mongoose.Schema.Types.ObjectId, ref: 'Bus', required: true},
   stations: { type: [String], required: true },
   time: { type: String },
   price: { type: Number },
-  driver_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Driver', required: true },
+  user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   publishSchedule: { type: [Object] },
-  taxiGroupId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  rideGroupId: { type: mongoose.Schema.Types.ObjectId, required: true },
   bookedSeats: { type: Map, of: Number, default: {} }
 }, { timestamps: true });
 
-const Taxi = mongoose.model('Taxi', taxiSchema);
+const Ride = mongoose.model('Ride', rideSchema);
 
-module.exports = Taxi;
+module.exports = Ride;
 
 
-// taxiController.js
-const Cab = require('../models/cabModel');
-const Taxi = require('../models/taxiModel');
+
+
+const Bus = require('../models/busModel');
+const Ride = require('../models/rideModel');
 const mongoose = require('mongoose');
-const CabDetails = require('../models/cabDetailsModel')
+const BusDetails = require('../models/busDetailsModel')
 
 const routePrices = {
   "Nyabugogo-Huye": 3700,
@@ -142,17 +93,18 @@ const routePrices = {
 
 const calculateRidePrice = (stations) => {
   if (!Array.isArray(stations)) {
-    return null;
+    return null; // Return null if stations is not an array
   }
 
   let totalPrice = 0;
 
+  // Calculate price for each segment of the journey
   for (let i = 0; i < stations.length - 1; i++) {
     const route = [stations[i], stations[i + 1]].join('-');
     if (routePrices.hasOwnProperty(route)) {
       totalPrice += routePrices[route];
     } else {
-      return null;
+      return null; // Return null if any segment price is not found
     }
   }
 
@@ -168,8 +120,8 @@ if (price !== null) {
   console.log('Price not found for the provided route');
 }
 
-const createTaxi = async (req, res) => {
-  const { stations, time, cab_id, price, schedule } = req.body;
+const createRide = async (req, res) => {
+  const { stations, time, bus_id, price, schedule } = req.body;
   let emptyFields = [];
 
   if (!stations || stations.length < 2) {
@@ -178,8 +130,8 @@ const createTaxi = async (req, res) => {
   if (!time) {
     emptyFields.push('time');
   }
-  if (!cab_id) {
-    emptyFields.push('cab_id');
+  if (!bus_id) {
+    emptyFields.push('bus_id');
   }
   if (!schedule || !schedule.type) {
     emptyFields.push('schedule.type');
@@ -189,23 +141,23 @@ const createTaxi = async (req, res) => {
   }
 
   try {
-    const selectedCab = await Cab.findById(cab_id);
-    if (!selectedCab) {
-      return res.status(404).json({ error: 'Selected cab not found' });
+    const selectedBus = await Bus.findById(bus_id);
+    if (!selectedBus) {
+      return res.status(404).json({ error: 'Selected bus not found' });
     }
 
-    const taxiDriver_id = req.taxiDriver._id;
-    const taxis = [];
-    const taxiGroupId = new mongoose.Types.ObjectId();
+    const user_id = req.user._id;
+    const rides = [];
+    const rideGroupId = new mongoose.Types.ObjectId();
 
-    const existingTaxisFromAB = await Taxi.find({ cab: selectedCab, stations: [stations[0], stations[1]] });
-    const existingTaxisFromBA = await Taxi.find({ cab: selectedCab, stations: [stations[1], stations[0]] });
+    const existingRidesFromAB = await Ride.find({ bus: selectedBus, stations: [stations[0], stations[1]] });
+    const existingRidesFromBA = await Ride.find({ bus: selectedBus, stations: [stations[1], stations[0]] });
 
-    if (existingTaxisFromAB.length >= selectedCab.capacity) {
+    if (existingRidesFromAB.length >= selectedBus.capacity) {
       return res.status(400).json({ error: 'Seats are full from station A to station B' });
     }
 
-    if (existingTaxisFromBA.length >= selectedCab.capacity) {
+    if (existingRidesFromBA.length >= selectedBus.capacity) {
       return res.status(400).json({ error: 'Seats are full from station B to station A' });
     }
 
@@ -217,150 +169,226 @@ const createTaxi = async (req, res) => {
         intervalMilliseconds = schedule.frequency * 3600000;
       }
 
-      const createTaxis = async () => {
+      const createRides = async () => {
         
         for (let i = 0; i < stations.length - 1; i++) {
           for (let j = i + 1; j < stations.length; j++) {
-            const taxiPrice = price || calculateRidePrice([stations[i], stations[j]]);
+            const ridePrice = price || calculateRidePrice([stations[i], stations[j]]);
 
-            const taxi1 = await Taxi.create({
-                cab: selectedCab,
-                stations: [stations[i], stations[j]],
-                time,
-                price: taxiPrice ? taxiPrice : null,
-                taxiDriver_id,
-                taxiGroupId,
-                publishSchedule: []
+            const ride1 = await Ride.create({
+              bus: selectedBus,
+              stations: [stations[i], stations[j]],
+              time,
+              price: ridePrice ? ridePrice : null,
+              user_id,
+              rideGroupId,
+              publishSchedule: []
             });
-            taxis.push(taxi1);
+            rides.push(ride1);
 
-            const taxi2 = await Taxi.create({
-                cab: selectedCab,
-                stations: [stations[j], stations[i]],
-                time,
-                price: taxiPrice ? taxiPrice : null,
-                taxiDriver_id,
-                taxiGroupId,
-                publishSchedule: []
+            const ride2 = await Ride.create({
+              bus: selectedBus,
+              stations: [stations[j], stations[i]],
+              time,
+              price: ridePrice ? ridePrice : null,
+              user_id,
+              rideGroupId,
+              publishSchedule: []
             });
-            taxis.push(taxi2);
-        }}
+            rides.push(ride2);
+          }
+        }
 
-        const cabDetails = await CabDetails.findOne({ taxiGroupId });
-        if (!cabDetails) {
-          await CabDetails.create({
-            taxiGroupId,
-            cabCapacity: selectedCab.capacity
+        const busDetails = await BusDetails.findOne({ rideGroupId });
+        if (!busDetails) {
+          await BusDetails.create({
+            rideGroupId,
+            busCapacity: selectedBus.capacity
           });
         }
       };
 
-      await createTaxis();
-      const intervalId = setInterval(createTaxis, intervalMilliseconds);
-      res.status(200).json({ taxis, intervalId });
+      await createRides();
+      const intervalId = setInterval(createRides, intervalMilliseconds);
+      res.status(200).json({ rides, intervalId });
     } else {
       
       for (let i = 0; i < stations.length - 1; i++) {
         for (let j = i + 1; j < stations.length; j++) {
-          const taxiPrice = price || calculateRidePrice([stations[i], stations[j]]);
+          const ridePrice = price || calculateRidePrice([stations[i], stations[j]]);
 
-          const taxi1 = await Taxi.create({
-            cab: selectedCab,
+          const ride1 = await Ride.create({
+            bus: selectedBus,
             stations: [stations[i], stations[j]],
             time,
-            price: taxiPrice ? taxiPrice : null,
-            taxiDriver_id,
-            taxiGroupId,
+            price: ridePrice ? ridePrice : null,
+            user_id,
+            rideGroupId,
             publishSchedule: schedule.type === 'scheduled' ? schedule.times : []
           });
-          taxis.push(taxi1);
+          rides.push(ride1);
 
-          const taxi2 = await Taxi.create({
-            cab: selectedCab,
+          const ride2 = await Ride.create({
+            bus: selectedBus,
             stations: [stations[j], stations[i]],
             time,
-            price: taxiPrice ? taxiPrice : null,
-            taxiDriver_id,
-            taxiGroupId,
+            price: ridePrice ? ridePrice : null,
+            user_id,
+            rideGroupId,
             publishSchedule: schedule.type === 'scheduled' ? schedule.times : []
           });
-          taxis.push(taxi2);
+          rides.push(ride2);
         }
       }
 
-      const cabDetails = await CabDetails.findOne({ taxiGroupId });
-      if (!cabDetails) {
-        await CabDetails.create({
-          taxiGroupId,
-          cabCapacity: selectedCab.capacity
+      const busDetails = await BusDetails.findOne({ rideGroupId });
+      if (!busDetails) {
+        await BusDetails.create({
+          rideGroupId,
+          busCapacity: selectedBus.capacity
         });
       }
 
-      res.status(200).json(taxis);
+      res.status(200).json(rides);
     }
   } catch (error) {
-    console.error('Error creating taxi:', error);
+    console.error('Error creating ride:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
 
-module.exports = { createTaxi };
+module.exports = { createRide };
 
 module.exports = {
-    createTaxi,
-    calculateRidePrice,
+  createRide,
+  calculateRidePrice,
 };
 
-// server.js
-const express = require('express');
-const cors = require('cors');
-const connectDB = require('./config/database');
-const http = require('http');
-const socketIo = require('socket.io');
-const carpoolRoutes = require('./routes/carpoolRoutes');
-const userRoutes = require('./routes/user');
-const busRoutes = require('./routes/bus');
-const rideRoutes = require('./routes/ride');
-const bookingRoutes = require('./routes/rideBookingRoutes');
-const carpoolBookingRoutes = require('./routes/bookingRoutes')
-const busDetailsRoutes = require('./routes/busDetails');
-const cabRoutes = require('./routes/cab')
-const cabDetailsRoutes = require('./routes/cabDetails');
-const taxiRoutes = require('./routes/taxi');
-const taxiBookingRoutes = require('./routes/taxiBookingRoutes');
-const taxiDriverRoutes = require('./routes/taxiDriver');
 
-const app = express();
-const PORT = process.env.PORT || 5000;
+// rideBookingModel.js
+const mongoose = require('mongoose');
 
-app.use(cors());
-app.use(express.json());
-
-app.use('/api/carpools', carpoolRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/bus', busRoutes);
-app.use('/api/rides', rideRoutes);
-app.use('/api/details', busDetailsRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/carpoolBookings', bookingRoutes);
-app.use('/api/cabDetails', cabDetailsRoutes);
-app.use('/api/taxis', taxiRoutes);
-app.use('/api/taxiBookings', taxiBookingRoutes);
-app.use('/api/taxiDrivers', taxiDriverRoutes);
-app.use('/api/cabs', cabRoutes);
-
-const server = http.createServer(app);
-const io = socketIo(server);
-
-module.exports.io = io;
-connectDB()
-  .then(() => {
-    server.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
-})
-  .catch((error) => {
-    console.log(error);
+const rideBookingSchema = new mongoose.Schema({
+  ride: { type: mongoose.Schema.Types.ObjectId, ref: 'Ride', required: true },
+  seatsBooked: { type: Number, required: true },
+  bookingDate: { type: Date, default: Date.now }
 });
 
+module.exports = mongoose.model('RideBooking', rideBookingSchema);
+
+
+
+
+// rideBookingController.js
+const RideBooking = require('../models/rideBookingModel');
+const BusDetails = require('../models/busDetailsModel');
+const Ride = require('../models/rideModel')
+
+const bookRide = async (req, res) => {
+  const { ride_id, seatsBooked } = req.body;
+  try {
+    const ride = await Ride.findById(ride_id);
+    if (!ride) {
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+
+    const booking = await RideBooking.create({
+      ride: ride_id,
+      seatsBooked
+    });
+
+    const updatedBusDetails = await BusDetails.findOneAndUpdate(
+      { rideGroupId: ride.rideGroupId },
+      { $inc: { busCapacity: -seatsBooked } },
+      { new: true }
+    );
+
+    res.status(201).json({ booking, updatedBusDetails });
+  } catch (error) {
+    console.error('Error booking ride:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+module.exports = { bookRide };
+
+
+// Booking.js
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useParams } from 'react-router-dom';
+
+const Booking = () => {
+  const { rideId } = useParams();
+  const [ride, setRide] = useState({ bus: { capacity: 0 } });
+  const [busDetails, setBusDetails] = useState({});
+  const [seatsBooked, setSeatsBooked] = useState(0);
+
+  const handleBooking = async () => {
+    try {
+      const response = await axios.post(`https://dostbackend.onrender.com/api/bookings`, {
+        ride_id: rideId,
+        seatsBooked
+      });
+      // Handle success, maybe show a message to the user
+    } catch (error) {
+      console.error('Error booking ride:', error);
+    }
+  };
+
+  useEffect(() => {
+    const fetchRideDetails = async () => {
+      try {
+        const response = await axios.get(`https://dostbackend.onrender.com/api/rides/${rideId}`);
+        setRide(response.data);
+    
+        // Fetch bus details using rideGroupId
+        const busDetailsResponse = await axios.get(`https://dostbackend.onrender.com/api/details/${response.data.rideGroupId}`); // Ensure correct URL
+        setBusDetails(busDetailsResponse.data);
+      } catch (error) {
+        console.error('Error fetching ride data', error);
+      }
+    };
+    if (rideId) {
+      fetchRideDetails();
+    } else {
+      console.error('Error: Ride ID not provided');
+    }
+  }, [rideId]);
+
+  if (!ride || !ride.stations || !busDetails) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div>
+      <p>Available Capacity: {busDetails.busCapacity}</p>
+      <h2>Book Seats</h2>
+      <input
+        type="number"
+        min="1"
+        max={busDetails.busCapacity}
+        value={seatsBooked}
+        onChange={(e) => setSeatsBooked(parseInt(e.target.value))}
+      />
+      <button onClick={handleBooking}>Book Seats</button>
+    </div>
+  );
+};
+
+export default Booking;
+
+
+i want that if i click to book a ride, as you can see the number of
+seats in the frontend gets reduced according to the number i inserted
+but now i want that if i book for a ride the decrementation of seats should affect
+only the rides with the same direction, eg: there are segments with one RideGroupId
+which are A to B , B to A , A to C, C to A , B to C , C to B because they share one RideGroupdId that means
+they will share one bus at journeys so if i book for the segment A to B the decrementation
+should work for the rides that doesn't have the same location as mine like B to A , B to C, C to B, C to A
+but for the rides like A to B, A to C those ones their seats should be decremented which also means if the seats
+totaly was 30 and i book for 2 seats only the rides B to A , B to C, C to B, C to A should keep having the full 30 seats
+but the rides A to B, A to C should remain with 28 seats, but the reason your changes might not work the reason is because it will decrement
+the seats in the database and remember that the segment shares on bus that's why ,
+ i hope you get it now i command you to provide codes to do it

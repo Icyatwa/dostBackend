@@ -1,42 +1,7 @@
-
-// rideBookingController.js
-const RideBooking = require('../models/rideBookingModel');
-const BusDetails = require('../models/busDetailsModel');
-const Ride = require('../models/rideModel')
-
-const bookRide = async (req, res) => {
-  const { ride_id, seatsBooked } = req.body;
-  try {
-    const ride = await Ride.findById(ride_id);
-    if (!ride) {
-      return res.status(404).json({ error: 'Ride not found' });
-    }
-
-    const booking = await RideBooking.create({
-      ride: ride_id,
-      seatsBooked
-    });
-
-    const updatedBusDetails = await BusDetails.findOneAndUpdate(
-      { rideGroupId: ride.rideGroupId },
-      { $inc: { busCapacity: -seatsBooked } },
-      { new: true }
-    );
-
-    res.status(201).json({ booking, updatedBusDetails });
-  } catch (error) {
-    console.error('Error booking ride:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
-
-module.exports = { bookRide };
-
-
 // // rideBookingController.js
 // const RideBooking = require('../models/rideBookingModel');
 // const BusDetails = require('../models/busDetailsModel');
-// const Ride = require('../models/rideModel')
+// const Ride = require('../models/rideModel');
 
 // const bookRide = async (req, res) => {
 //   const { ride_id, seatsBooked } = req.body;
@@ -46,32 +11,49 @@ module.exports = { bookRide };
 //       return res.status(404).json({ error: 'Ride not found' });
 //     }
 
-//     // Find rides with matching segments
-//     const ridesWithMatchingSegments = await Ride.find({
-//       rideGroupId: ride.rideGroupId,
-//       stations: { $in: ride.stations }
-//     });
-
-//     // Calculate total seats booked considering all matching rides
-//     let totalSeatsBooked = 0;
-//     for (const matchingRide of ridesWithMatchingSegments) {
-//       const bookings = await RideBooking.find({ ride: matchingRide._id });
-//       totalSeatsBooked += bookings.reduce((acc, curr) => acc + curr.seatsBooked, 0);
-//     }
-
-//     const updatedBusDetails = await BusDetails.findOneAndUpdate(
-//       { rideGroupId: ride.rideGroupId },
-//       { $inc: { busCapacity: -totalSeatsBooked } },
-//       { new: true }
-//     );
-
-//     // Create booking for the specific ride
+//     // Book the ride
 //     const booking = await RideBooking.create({
 //       ride: ride_id,
 //       seatsBooked
 //     });
 
-//     res.status(201).json({ booking, updatedBusDetails });
+//     // Update bus details for the specific segments
+//     const busDetails = await BusDetails.findOne({ rideGroupId: ride.rideGroupId });
+
+//     if (!busDetails) {
+//       return res.status(404).json({ error: 'Bus details not found' });
+//     }
+
+//     const startStation = ride.stations[0];
+//     const endStation = ride.stations[1];
+
+//     const segmentsToUpdate = new Set();
+
+//     // Collect segments with the same starting point
+//     const ridesWithSameStart = await Ride.find({ rideGroupId: ride.rideGroupId, 'stations.0': startStation });
+//     ridesWithSameStart.forEach(ride => {
+//       segmentsToUpdate.add(`${ride.stations[0]}-${ride.stations[1]}`);
+//     });
+
+//     // Collect segments with the same ending point
+//     const ridesWithSameEnd = await Ride.find({ rideGroupId: ride.rideGroupId, 'stations.1': endStation });
+//     ridesWithSameEnd.forEach(ride => {
+//       segmentsToUpdate.add(`${ride.stations[0]}-${ride.stations[1]}`);
+//     });
+
+//     // Update capacities for all relevant segments
+//     segmentsToUpdate.forEach(segmentKey => {
+//       if (!busDetails.segmentCapacities.has(segmentKey)) {
+//         busDetails.segmentCapacities.set(segmentKey, busDetails.busCapacity);
+//       }
+
+//       const updatedCapacity = busDetails.segmentCapacities.get(segmentKey) - seatsBooked;
+//       busDetails.segmentCapacities.set(segmentKey, updatedCapacity);
+//     });
+
+//     await busDetails.save();
+
+//     res.status(201).json({ booking, updatedBusDetails: busDetails });
 //   } catch (error) {
 //     console.error('Error booking ride:', error);
 //     res.status(500).json({ error: 'Internal Server Error' });
@@ -79,4 +61,89 @@ module.exports = { bookRide };
 // };
 
 // module.exports = { bookRide };
+
+
+const mongoose = require('mongoose');
+const Ride = require('../models/rideModel');
+const RideBooking = require('../models/rideBookingModel');
+const BusDetails = require('../models/busDetailsModel');
+
+const bookRide = async (req, res) => {
+  const { ride_id, seatsBooked } = req.body;
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const ride = await Ride.findById(ride_id).session(session);
+    if (!ride) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+
+    const booking = await RideBooking.create([{ 
+      ride: ride_id, 
+      seatsBooked 
+    }], { session });
+
+    const busDetails = await BusDetails.findOne({ rideGroupId: ride.rideGroupId }).session(session);
+    if (!busDetails) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: 'Bus details not found' });
+    }
+
+    const startStation = ride.stations[0];
+    const endStation = ride.stations[1];
+
+    const segmentsToUpdate = new Set();
+
+    // Find all segments that start at the same station
+    const ridesWithSameStart = await Ride.find({ 
+      rideGroupId: ride.rideGroupId, 
+      'stations.0': startStation 
+    }).session(session);
+    ridesWithSameStart.forEach(ride => {
+      segmentsToUpdate.add(`${ride.stations[0]}-${ride.stations[1]}`);
+    });
+
+    // Find all segments that end at the same station
+    const ridesWithSameEnd = await Ride.find({ 
+      rideGroupId: ride.rideGroupId, 
+      'stations.1': endStation 
+    }).session(session);
+    ridesWithSameEnd.forEach(ride => {
+      segmentsToUpdate.add(`${ride.stations[0]}-${ride.stations[1]}`);
+    });
+
+    segmentsToUpdate.forEach(segmentKey => {
+      if (!busDetails.segmentCapacities.has(segmentKey)) {
+        busDetails.segmentCapacities.set(segmentKey, busDetails.busCapacity);
+      }
+
+      const currentCapacity = busDetails.segmentCapacities.get(segmentKey);
+      const updatedCapacity = currentCapacity - seatsBooked;
+
+      if (updatedCapacity < 0) {
+        throw new Error('Not enough capacity available for the booking');
+      }
+
+      busDetails.segmentCapacities.set(segmentKey, updatedCapacity);
+    });
+
+    await busDetails.save({ session });
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(201).json({ booking, updatedBusDetails: busDetails });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error booking ride:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+module.exports = { bookRide };
+
 

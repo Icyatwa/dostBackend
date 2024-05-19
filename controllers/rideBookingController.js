@@ -114,47 +114,21 @@ const bookRide = async (req, res) => {
 
     const startStation = ride.stations[0];
     const endStation = ride.stations[1];
+    const segmentKey = `${startStation}-${endStation}`;
 
-    const segmentsToUpdate = new Set();
+    // Ensure segment capacity is tracked separately for each direction
+    if (!busDetails.segmentCapacities.has(segmentKey)) {
+      busDetails.segmentCapacities.set(segmentKey, busDetails.busCapacity);
+    }
 
-    // Find all segments that start at the same station
-    const ridesWithSameStart = await Ride.find({ 
-      rideGroupId: ride.rideGroupId, 
-      'stations.0': startStation 
-    }).session(session);
-    ridesWithSameStart.forEach(ride => {
-      // Ensure segment direction matches
-      if (ride.stations[1] !== endStation) {
-        segmentsToUpdate.add(`${ride.stations[0]}-${ride.stations[1]}`);
-      }
-    });
+    const currentCapacity = busDetails.segmentCapacities.get(segmentKey);
+    const updatedCapacity = currentCapacity - seatsBooked;
 
-    // Find all segments that end at the same station
-    const ridesWithSameEnd = await Ride.find({ 
-      rideGroupId: ride.rideGroupId, 
-      'stations.1': endStation 
-    }).session(session);
-    ridesWithSameEnd.forEach(ride => {
-      // Ensure segment direction matches
-      if (ride.stations[0] !== startStation) {
-        segmentsToUpdate.add(`${ride.stations[0]}-${ride.stations[1]}`);
-      }
-    });
+    if (updatedCapacity < 0) {
+      throw new Error('Not enough capacity available for the booking');
+    }
 
-    segmentsToUpdate.forEach(segmentKey => {
-      if (!busDetails.segmentCapacities.has(segmentKey)) {
-        busDetails.segmentCapacities.set(segmentKey, busDetails.busCapacity);
-      }
-
-      const currentCapacity = busDetails.segmentCapacities.get(segmentKey);
-      const updatedCapacity = currentCapacity - seatsBooked;
-
-      if (updatedCapacity < 0) {
-        throw new Error('Not enough capacity available for the booking');
-      }
-
-      busDetails.segmentCapacities.set(segmentKey, updatedCapacity);
-    });
+    busDetails.segmentCapacities.set(segmentKey, updatedCapacity);
 
     await busDetails.save({ session });
     await session.commitTransaction();

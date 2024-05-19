@@ -112,11 +112,8 @@ const bookRide = async (req, res) => {
       return res.status(404).json({ error: 'Bus details not found' });
     }
 
-    const startStation = ride.stations[0];
-    const endStation = ride.stations[1];
-    const segmentKey = `${startStation}-${endStation}`;
+    const segmentKey = `${ride.stations[0]}-${ride.stations[1]}`;
 
-    // Ensure segment capacity is tracked separately for each direction
     if (!busDetails.segmentCapacities.has(segmentKey)) {
       busDetails.segmentCapacities.set(segmentKey, busDetails.busCapacity);
     }
@@ -142,5 +139,6 @@ const bookRide = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 module.exports = { bookRide };

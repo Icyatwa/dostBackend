@@ -1,3 +1,4 @@
+// rideBookingController.js
 const mongoose = require('mongoose');
 const Ride = require('../models/rideModel');
 const RideBooking = require('../models/rideBookingModel');
@@ -79,66 +80,19 @@ const bookRide = async (req, res) => {
   }
 };
 
-module.exports = { bookRide };
+const getBookingsByPostId = async (req, res) => {
+  const postId = req.params.postId;
 
+  try{
+    const bookings = await RideBooking.find({ride_id: postId});
+    res.status(200).json(bookings);
+  } catch(error){
+    console.error('Error fetching bookings:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+}
 
-// const mongoose = require('mongoose');
-// const Ride = require('../models/rideModel');
-// const RideBooking = require('../models/rideBookingModel');
-// const BusDetails = require('../models/busDetailsModel');
-
-// const bookRide = async (req, res) => {
-//   const { ride_id, seatsBooked } = req.body;
-//   const session = await mongoose.startSession();
-//   session.startTransaction();
-
-//   try {
-//     const ride = await Ride.findById(ride_id).session(session);
-//     if (!ride) {
-//       await session.abortTransaction();
-//       session.endSession();
-//       return res.status(404).json({ error: 'Ride not found' });
-//     }
-
-//     const booking = await RideBooking.create([{ 
-//       ride: ride_id, 
-//       seatsBooked 
-//     }], { session });
-
-//     const busDetails = await BusDetails.findOne({ rideGroupId: ride.rideGroupId }).session(session);
-//     if (!busDetails) {
-//       await session.abortTransaction();
-//       session.endSession();
-//       return res.status(404).json({ error: 'Bus details not found' });
-//     }
-
-//     const segmentKey = `${ride.stations[0]}-${ride.stations[1]}`;
-
-//     if (!busDetails.segmentCapacities.has(segmentKey)) {
-//       busDetails.segmentCapacities.set(segmentKey, busDetails.busCapacity);
-//     }
-
-//     const currentCapacity = busDetails.segmentCapacities.get(segmentKey);
-//     const updatedCapacity = currentCapacity - seatsBooked;
-
-//     if (updatedCapacity < 0) {
-//       throw new Error('Not enough capacity available for the booking');
-//     }
-
-//     busDetails.segmentCapacities.set(segmentKey, updatedCapacity);
-
-//     await busDetails.save({ session });
-//     await session.commitTransaction();
-//     session.endSession();
-
-//     res.status(201).json({ booking, updatedBusDetails: busDetails });
-//   } catch (error) {
-//     await session.abortTransaction();
-//     session.endSession();
-//     console.error('Error booking ride:', error);
-//     res.status(500).json({ error: 'Internal Server Error' });
-//   }
-// };
-
-
-// module.exports = { bookRide };
+module.exports = {
+  bookRide,
+  getBookingsByPostId
+};
